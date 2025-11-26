@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, BookOpen, FileText, TrendingUp, Award, Settings, Plus, Search, Filter, Download, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, Target } from 'lucide-react';
+import { LucideIcon } from "lucide-react"; // if icons are from lucide
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -18,6 +19,14 @@ const AdminDashboard = () => {
     avgScore: 67.5,
     revenue: 456780
   };
+
+type StatCardProps = {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  change?: number;
+  color: string;
+};
 
   const subjectData = [
     { name: 'Bangla', questions: 2340, attempts: 8934, avgScore: 72 },
@@ -66,7 +75,7 @@ const AdminDashboard = () => {
     { id: 4, text: 'সমকোণী ত্রিভুজের বৈশিষ্ট্য কি?', subject: 'Math', bcs: '37th', status: 'active' }
   ];
 
-  const StatCard = ({ icon: Icon, label, value, change, color }) => (
+  const StatCard = ({ icon: Icon, label, value, change, color }:StatCardProps) => (
     <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-center justify-between mb-4">
         <div className={`p-3 rounded-lg ${color}`}>

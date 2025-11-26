@@ -22,6 +22,19 @@ import {
   Calendar
 } from "lucide-react"
 
+type LeaderboardUser = {
+  rank: number;
+  name: string;
+  score: number;
+  accuracy: number;
+  avatar: string;
+  isCurrentUser: boolean;
+  timeSpent?: string;
+  exams?: number;
+  streak?: number;
+  improvement?: number;
+};
+
 // Mock leaderboard data
 const leaderboardData = {
   overall: [
@@ -78,7 +91,7 @@ export function LeaderboardDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [timeFilter, setTimeFilter] = useState<"all" | "weekly" | "monthly">("all")
 
-  const currentLeaderboard = useMemo(() => {
+  const currentLeaderboard = useMemo<LeaderboardUser[]>(() => {
     if (activeTab === "subjects") {
       return leaderboardData.subjects[selectedSubject as keyof typeof leaderboardData.subjects] || []
     }
@@ -277,7 +290,7 @@ export function LeaderboardDashboard() {
                             <span>•</span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {user.timeSpent}
+                              {/* {user.timeSpent} */}
                             </span>
                             <span>•</span>
                             <span>{user.exams} exams</span>
@@ -310,67 +323,53 @@ export function LeaderboardDashboard() {
               {/* Weekly Leaderboard */}
               <TabsContent value="weekly" className="space-y-4">
                 <div className="space-y-3">
-                  {filteredLeaderboard.map((user) => (
-                    <div
-                      key={user.rank}
-                      className={`
-                        flex items-center gap-4 p-4 rounded-xl border-2 transition-all
-                        ${user.isCurrentUser 
-                          ? 'border-green-500 bg-green-50 shadow-lg' 
-                          : 'border-gray-100 bg-white hover:border-gray-200'
-                        }
-                      `}
-                    >
-                      {/* Rank */}
-                      <div className={`
-                        flex items-center justify-center w-12 h-12 rounded-xl font-bold text-lg
-                        ${getRankColor(user.rank)}
-                      `}>
-                        {user.rank <= 3 ? getRankIcon(user.rank) : user.rank}
-                      </div>
+                  {filteredLeaderboard.map(user => {
+  const improvement = user.improvement ?? 0;
 
-                      {/* User Info */}
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className="text-2xl">{user.avatar}</div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className={`font-semibold truncate ${
-                              user.isCurrentUser ? 'text-green-900' : 'text-gray-900'
-                            }`}>
-                              {user.name}
-                            </h3>
-                            <Badge 
-                              variant="outline"
-                              className={
-                                user.improvement >= 0 
-                                  ? 'bg-green-50 text-green-700 border-green-200' 
-                                  : 'bg-red-50 text-red-700 border-red-200'
-                              }
-                            >
-                              {user.improvement >= 0 ? '+' : ''}{user.improvement}%
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <span>{user.accuracy}% accuracy</span>
-                            <span>•</span>
-                            <span>{user.timeSpent} total</span>
-                            <span>•</span>
-                            <span>{user.exams} exams</span>
-                          </div>
-                        </div>
-                      </div>
+  return (
+    <div key={user.rank} className="flex items-center gap-4 p-4 rounded-xl border-2">
+      <div className="flex items-center gap-4 flex-1 min-w-0">
+        <div className="text-2xl">{user.avatar}</div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className={`font-semibold truncate ${
+              user.isCurrentUser ? "text-green-900" : "text-gray-900"
+            }`}>
+              {user.name}
+            </h3>
 
-                      {/* Score */}
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-gray-900">
-                          {user.score}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Weekly Score
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+            {/* ✅ Safe improvement */}
+            <Badge
+              variant="outline"
+              className={
+                improvement >= 0
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : "bg-red-50 text-red-700 border-red-200"
+              }
+            >
+              {improvement >= 0 ? "+" : ""}
+              {improvement}%
+            </Badge>
+          </div>
+
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <span>{user.accuracy}% accuracy</span>
+            <span>•</span>
+            {/* <span>{user.timeSpent ?? "—"} total</span>  */}
+            <span>•</span>
+            <span>{user.exams ?? 0} exams</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-right">
+        <div className="text-2xl font-bold">{user.score}</div>
+        <div className="text-sm text-gray-600">Weekly Score</div>
+      </div>
+    </div>
+  );
+})}
+
                 </div>
               </TabsContent>
 
