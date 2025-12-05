@@ -1,11 +1,11 @@
 import AdminDashboard from '@/components/admin/Dashboard/AdminDashboard'
-import React from 'react'
+import RoleProtected from '@/components/protected/role-protected'
 
 const page = () => {
   return (
-    <div>
+        <RoleProtected allowedRoles={['admin']}>
       <AdminDashboard/>
-    </div>
+        </RoleProtected>
   )
 }
 

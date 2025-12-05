@@ -1,3 +1,4 @@
+import RoleProtected from "@/components/protected/role-protected";
 import { DailyGoal } from "@/components/students/DailyGoal";
 import { DashboardStats } from "@/components/students/DashboardStats";
 import { QuickActions } from "@/components/students/QuickActions";
@@ -7,6 +8,8 @@ import { WeakTopics } from "@/components/students/WeakTopicsCard";
 
 export default function StudentDashboard() {
   return (
+        <RoleProtected allowedRoles={['student', 'teacher', 'admin']}>
+
     <div className="min-h-screen bg-gray-50/30 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
@@ -47,5 +50,7 @@ export default function StudentDashboard() {
         </div>
       </div>
     </div>
+        </RoleProtected>
+
   )
 }

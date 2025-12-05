@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,40 +23,44 @@ import {
   Bell,
   Lock,
   Download,
-  Share
+  Share,
+  Loader2,
+  X
 } from "lucide-react"
+import { useUserProfile } from "@/hooks/useUserProfile"
+import { toast } from "sonner"
 
-// Mock user data
-const userData = {
+// Default data structure
+const defaultUserData = {
   personal: {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+880 1XXX-XXXXXX",
-    dateOfBirth: "1995-05-15",
+    name: "",
+    email: "",
+    phone: "",
+    dateOfBirth: "",
     gender: "Male",
-    address: "Dhaka, Bangladesh",
-    avatar: "JD",
-    joinDate: "January 2024"
+    address: "",
+    avatar: "U",
+    joinDate: ""
   },
   academic: {
-    institution: "University of Dhaka",
-    degree: "BSc in Computer Science",
-    graduationYear: "2018",
-    cgpa: "3.75",
+    institution: "",
+    degree: "",
+    graduationYear: "",
+    cgpa: "",
     bcsExam: "44th BCS",
     targetCadre: "Administration Cadre",
-    preparationStart: "2023",
+    preparationStart: "",
     studyHours: "4-6 hours daily"
   },
   stats: {
-    examsTaken: 24,
-    totalQuestions: 4800,
-    averageScore: 72.5,
-    accuracy: 68.3,
-    currentRank: 156,
-    improvement: 8.2,
-    streak: 18,
-    studyTime: "96h 30m"
+    examsTaken: 0,
+    totalQuestions: 0,
+    averageScore: 0,
+    accuracy: 0,
+    currentRank: 0,
+    improvement: 0,
+    streak: 0,
+    studyTime: "0h 0m"
   },
   preferences: {
     emailNotifications: true,
@@ -68,18 +72,27 @@ const userData = {
     theme: "Light"
   },
   subscription: {
-    plan: "Premium",
+    plan: "Free",
     status: "Active",
-    since: "2024-01-15",
-    expires: "2024-07-15",
-    features: ["Unlimited Tests", "Advanced Analytics", "Priority Support", "Download Materials"]
+    since: "",
+    expires: "",
+    features: ["Basic Tests", "Progress Tracking"]
   }
 }
 
 export function ProfileDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState(userData)
+  const [formData, setFormData] = useState(defaultUserData)
+
+  const { profile, isLoading, updateProfile, isUpdating } = useUserProfile()
+
+  // Update form data when profile is loaded
+  useEffect(() => {
+    if (profile) {
+      setFormData(profile)
+    }
+  }, [profile])
 
   const handleInputChange = (section: string, field: string, value: any) => {
     setFormData(prev => ({
@@ -91,16 +104,69 @@ export function ProfileDashboard() {
     }))
   }
 
-  const handleSave = () => {
-    // Here you would typically make an API call to save the data
-    console.log("Saving data:", formData)
-    setIsEditing(false)
-    // Show success message
+  const handleSave = async () => {
+    try {
+      await updateProfile({
+        personal: formData.personal,
+        academic: formData.academic,
+        preferences: formData.preferences
+      })
+      setIsEditing(false)
+    } catch (error) {
+      // Error handling is done in the mutation
+    }
   }
 
   const handleCancel = () => {
-    setFormData(userData)
+    if (profile) {
+      setFormData(profile)
+    }
     setIsEditing(false)
+  }
+
+  const handleExportData = async () => {
+    try {
+      const dataStr = JSON.stringify(profile, null, 2)
+      const dataBlob = new Blob([dataStr], { type: 'application/json' })
+      const url = URL.createObjectURL(dataBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `shorborno-profile-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      toast.success('Data exported successfully')
+    } catch (error) {
+      toast.error('Failed to export data')
+    }
+  }
+
+  const handleChangePassword = () => {
+    toast.info('Password change feature coming soon!')
+  }
+
+  const handleUpgradePlan = () => {
+    toast.info('Plan upgrade feature coming soon!')
+  }
+
+  const handleManageSubscription = () => {
+    toast.info('Subscription management coming soon!')
+  }
+
+  const handleCancelSubscription = () => {
+    toast.info('Subscription cancellation coming soon!')
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
+          <p className="mt-2 text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -109,9 +175,9 @@ export function ProfileDashboard() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-8">
           <div className="flex items-start gap-6">
-        <div className="relative">
+            <div className="relative">
               <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">
-                {formData.personal.avatar}
+                {formData.personal.name ? formData.personal.name.split(' ').map(n => n[0]).join('') : 'U'}
               </div>
               {isEditing && (
                 <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white border border-gray-300 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-50">
@@ -120,7 +186,7 @@ export function ProfileDashboard() {
               )}
             </div>
             
-            <div>
+            <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-bold text-gray-900">
                   {isEditing ? (
@@ -128,29 +194,38 @@ export function ProfileDashboard() {
                       type="text"
                       value={formData.personal.name}
                       onChange={(e) => handleInputChange("personal", "name", e.target.value)}
-                      className="bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
+                      className="bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-1 min-w-[200px]"
+                      placeholder="Enter your name"
                     />
                   ) : (
-                    formData.personal.name
+                    formData.personal.name || "Anonymous User"
                   )}
                 </h1>
-                <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+                <Badge className={`${
+                  formData.subscription.plan === 'Premium' 
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                    : formData.subscription.plan === 'Pro'
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500'
+                    : 'bg-gray-500'
+                } text-white`}>
                   {formData.subscription.plan}
                 </Badge>
               </div>
-              <p className="text-gray-600 mb-2">BCS Aspirant • Member since {formData.personal.joinDate}</p>
+              <p className="text-gray-600 mb-2">
+                BCS Aspirant • Member since {formData.personal.joinDate || "recently"}
+              </p>
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <span className="flex items-center gap-1">
                   <Award className="h-4 w-4" />
-                  Rank #{formData.stats.currentRank}
+                  Rank #{formData.stats.currentRank || "N/A"}
                 </span>
                 <span className="flex items-center gap-1">
                   <TrendingUp className="h-4 w-4" />
-                  {formData.stats.improvement}% improvement
+                  {formData.stats.improvement || 0}% improvement
                 </span>
                 <span className="flex items-center gap-1">
                   <BookOpen className="h-4 w-4" />
-                  {formData.stats.streak} day streak
+                  {formData.stats.streak || 0} day streak
                 </span>
               </div>
             </div>
@@ -159,21 +234,42 @@ export function ProfileDashboard() {
           <div className="flex gap-3">
             {isEditing ? (
               <>
-                <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
+                <Button 
+                  onClick={handleSave} 
+                  disabled={isUpdating}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isUpdating ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {isUpdating ? 'Saving...' : 'Save Changes'}
                 </Button>
-                <Button variant="outline" onClick={handleCancel}>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCancel} 
+                  disabled={isUpdating}
+                  className="flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
                   Cancel
                 </Button>
               </>
             ) : (
               <>
-                <Button onClick={() => setIsEditing(true)} className="flex items-center gap-2">
+                <Button 
+                  onClick={() => setIsEditing(true)} 
+                  className="flex items-center gap-2"
+                >
                   <Edit3 className="h-4 w-4" />
                   Edit Profile
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={handleExportData}
+                >
                   <Download className="h-4 w-4" />
                   Export Data
                 </Button>
@@ -224,10 +320,11 @@ export function ProfileDashboard() {
                           type="email"
                           value={formData.personal.email}
                           onChange={(e) => handleInputChange("personal", "email", e.target.value)}
-                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
+                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-1"
+                          placeholder="Enter your email"
                         />
                       ) : (
-                        <div className="font-medium text-gray-900">{formData.personal.email}</div>
+                        <div className="font-medium text-gray-900">{formData.personal.email || "Not set"}</div>
                       )}
                     </div>
                   </div>
@@ -241,10 +338,11 @@ export function ProfileDashboard() {
                           type="tel"
                           value={formData.personal.phone}
                           onChange={(e) => handleInputChange("personal", "phone", e.target.value)}
-                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
+                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-1"
+                          placeholder="Enter your phone number"
                         />
                       ) : (
-                        <div className="font-medium text-gray-900">{formData.personal.phone}</div>
+                        <div className="font-medium text-gray-900">{formData.personal.phone || "Not set"}</div>
                       )}
                     </div>
                   </div>
@@ -258,10 +356,11 @@ export function ProfileDashboard() {
                           type="text"
                           value={formData.personal.address}
                           onChange={(e) => handleInputChange("personal", "address", e.target.value)}
-                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
+                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-1"
+                          placeholder="Enter your address"
                         />
                       ) : (
-                        <div className="font-medium text-gray-900">{formData.personal.address}</div>
+                        <div className="font-medium text-gray-900">{formData.personal.address || "Not set"}</div>
                       )}
                     </div>
                   </div>
@@ -275,13 +374,31 @@ export function ProfileDashboard() {
                           type="date"
                           value={formData.personal.dateOfBirth}
                           onChange={(e) => handleInputChange("personal", "dateOfBirth", e.target.value)}
-                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
+                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-1"
                         />
                       ) : (
-                        <div className="font-medium text-gray-900">{formData.personal.dateOfBirth}</div>
+                        <div className="font-medium text-gray-900">{formData.personal.dateOfBirth || "Not set"}</div>
                       )}
                     </div>
                   </div>
+
+                  {isEditing && (
+                    <div className="flex items-center gap-3">
+                      <User className="h-4 w-4 text-gray-400" />
+                      <div className="flex-1">
+                        <div className="text-sm text-gray-600">Gender</div>
+                        <select
+                          value={formData.personal.gender}
+                          onChange={(e) => handleInputChange("personal", "gender", e.target.value)}
+                          className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-1 py-1"
+                        >
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -370,7 +487,10 @@ export function ProfileDashboard() {
                   <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
                     <div className="text-sm font-medium text-blue-900 mb-1">Current Focus</div>
                     <div className="text-xs text-blue-700">
-                      Improving accuracy in General Knowledge and International Affairs
+                      {formData.stats.examsTaken > 0 
+                        ? "Improving accuracy in General Knowledge and International Affairs"
+                        : "Start your first exam to see personalized focus areas"
+                      }
                     </div>
                   </div>
 
@@ -400,9 +520,12 @@ export function ProfileDashboard() {
                         value={formData.academic.institution}
                         onChange={(e) => handleInputChange("academic", "institution", e.target.value)}
                         className="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Enter your institution"
                       />
                     ) : (
-                      <div className="font-medium text-gray-900 mt-1">{formData.academic.institution}</div>
+                      <div className="font-medium text-gray-900 mt-1">
+                        {formData.academic.institution || "Not set"}
+                      </div>
                     )}
                   </div>
 
@@ -414,9 +537,12 @@ export function ProfileDashboard() {
                         value={formData.academic.degree}
                         onChange={(e) => handleInputChange("academic", "degree", e.target.value)}
                         className="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Enter your degree"
                       />
                     ) : (
-                      <div className="font-medium text-gray-900 mt-1">{formData.academic.degree}</div>
+                      <div className="font-medium text-gray-900 mt-1">
+                        {formData.academic.degree || "Not set"}
+                      </div>
                     )}
                   </div>
 
@@ -429,9 +555,12 @@ export function ProfileDashboard() {
                           value={formData.academic.graduationYear}
                           onChange={(e) => handleInputChange("academic", "graduationYear", e.target.value)}
                           className="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="e.g., 2018"
                         />
                       ) : (
-                        <div className="font-medium text-gray-900 mt-1">{formData.academic.graduationYear}</div>
+                        <div className="font-medium text-gray-900 mt-1">
+                          {formData.academic.graduationYear || "Not set"}
+                        </div>
                       )}
                     </div>
 
@@ -443,9 +572,12 @@ export function ProfileDashboard() {
                           value={formData.academic.cgpa}
                           onChange={(e) => handleInputChange("academic", "cgpa", e.target.value)}
                           className="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="e.g., 3.75"
                         />
                       ) : (
-                        <div className="font-medium text-gray-900 mt-1">{formData.academic.cgpa}</div>
+                        <div className="font-medium text-gray-900 mt-1">
+                          {formData.academic.cgpa || "Not set"}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -469,6 +601,7 @@ export function ProfileDashboard() {
                         <option value="44th BCS">44th BCS</option>
                         <option value="45th BCS">45th BCS</option>
                         <option value="46th BCS">46th BCS</option>
+                        <option value="47th BCS">47th BCS</option>
                       </select>
                     ) : (
                       <div className="font-medium text-gray-900 mt-1">{formData.academic.bcsExam}</div>
@@ -487,6 +620,8 @@ export function ProfileDashboard() {
                         <option value="Police Cadre">Police Cadre</option>
                         <option value="Foreign Cadre">Foreign Cadre</option>
                         <option value="Taxation Cadre">Taxation Cadre</option>
+                        <option value="Customs & Excise Cadre">Customs & Excise Cadre</option>
+                        <option value="Education Cadre">Education Cadre</option>
                       </select>
                     ) : (
                       <div className="font-medium text-gray-900 mt-1">{formData.academic.targetCadre}</div>
@@ -501,9 +636,12 @@ export function ProfileDashboard() {
                         value={formData.academic.preparationStart}
                         onChange={(e) => handleInputChange("academic", "preparationStart", e.target.value)}
                         className="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g., 2023"
                       />
                     ) : (
-                      <div className="font-medium text-gray-900 mt-1">{formData.academic.preparationStart}</div>
+                      <div className="font-medium text-gray-900 mt-1">
+                        {formData.academic.preparationStart || "Not set"}
+                      </div>
                     )}
                   </div>
 
@@ -515,6 +653,7 @@ export function ProfileDashboard() {
                         onChange={(e) => handleInputChange("academic", "studyHours", e.target.value)}
                         className="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
+                        <option value="1-2 hours daily">1-2 hours daily</option>
                         <option value="2-4 hours daily">2-4 hours daily</option>
                         <option value="4-6 hours daily">4-6 hours daily</option>
                         <option value="6-8 hours daily">6-8 hours daily</option>
@@ -545,20 +684,27 @@ export function ProfileDashboard() {
                     { key: "weeklyReports", label: "Weekly Reports", description: "Weekly performance summary" },
                     { key: "publicProfile", label: "Public Profile", description: "Make your profile visible to others" }
                   ].map((pref) => (
-                    <div key={pref.key} className="flex items-center justify-between">
-                      <div>
+                    <div key={pref.key} className="flex items-center justify-between py-2">
+                      <div className="flex-1">
                         <div className="font-medium text-gray-900">{pref.label}</div>
                         <div className="text-sm text-gray-600">{pref.description}</div>
                       </div>
                       {isEditing ? (
-                        <input
-                          type="checkbox"
-                          checked={formData.preferences[pref.key as keyof typeof formData.preferences] as boolean}
-                          onChange={(e) => handleInputChange("preferences", pref.key, e.target.checked)}
-                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                        />
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.preferences[pref.key as keyof typeof formData.preferences] as boolean}
+                            onChange={(e) => handleInputChange("preferences", pref.key, e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
                       ) : (
-                        <div className={`w-3 h-3 rounded-full ${formData.preferences[pref.key as keyof typeof formData.preferences] ? 'bg-green-500' : 'bg-gray-300'}`} />
+                        <div className={`w-3 h-3 rounded-full ${
+                          formData.preferences[pref.key as keyof typeof formData.preferences] 
+                            ? 'bg-green-500' 
+                            : 'bg-gray-300'
+                        }`} />
                       )}
                     </div>
                   ))}
@@ -605,15 +751,23 @@ export function ProfileDashboard() {
                   </div>
 
                   <div className="pt-4 border-t">
-                    <Button variant="outline" className="w-full flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
+                    <Button 
+                      variant="outline" 
+                      className="w-full flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      onClick={handleChangePassword}
+                    >
                       <Lock className="h-4 w-4" />
                       Change Password
                     </Button>
                   </div>
 
                   <div>
-                    <Button variant="outline" className="w-full flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
-                      <Share className="h-4 w-4" />
+                    <Button 
+                      variant="outline" 
+                      className="w-full flex items-center gap-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                      onClick={handleExportData}
+                    >
+                      <Download className="h-4 w-4" />
                       Download My Data
                     </Button>
                   </div>
@@ -639,13 +793,23 @@ export function ProfileDashboard() {
                       <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
                         <div className="text-sm font-medium text-gray-600">Current Plan</div>
                         <div className="text-2xl font-bold text-gray-900 mt-1">{formData.subscription.plan}</div>
-                        <Badge className="bg-green-100 text-green-700 mt-2">{formData.subscription.status}</Badge>
+                        <Badge className={`${
+                          formData.subscription.status === 'Active' 
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        } mt-2`}>
+                          {formData.subscription.status}
+                        </Badge>
                       </div>
 
                       <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
                         <div className="text-sm font-medium text-gray-600">Expires On</div>
-                        <div className="text-xl font-bold text-gray-900 mt-1">{formData.subscription.expires}</div>
-                        <div className="text-sm text-gray-600 mt-1">Auto-renewal enabled</div>
+                        <div className="text-xl font-bold text-gray-900 mt-1">
+                          {formData.subscription.expires || "Never"}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {formData.subscription.plan === 'Free' ? 'Free forever' : 'Auto-renewal enabled'}
+                        </div>
                       </div>
                     </div>
 
@@ -663,13 +827,24 @@ export function ProfileDashboard() {
                   </div>
 
                   <div className="space-y-4">
-                    <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    <Button 
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      onClick={handleUpgradePlan}
+                    >
                       Upgrade Plan
                     </Button>
-                    <Button variant="outline" className="w-full">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={handleManageSubscription}
+                    >
                       Manage Subscription
                     </Button>
-                    <Button variant="outline" className="w-full text-red-600 hover:text-red-700 hover:bg-red-50">
+                    <Button 
+                      variant="outline" 
+                      className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={handleCancelSubscription}
+                    >
                       Cancel Subscription
                     </Button>
                   </div>

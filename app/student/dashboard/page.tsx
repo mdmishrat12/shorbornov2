@@ -1,33 +1,54 @@
-import { DailyGoalCard } from "@/components/students/DailyGoalCard";
-import { QuickActionsGrid } from "@/components/students/QuickActionsGrid";
-import { RecentActivity } from "@/components/students/RecentActivity";
-import { StatsGrid } from "@/components/students/StatsGrid";
-import { WeakTopics } from "@/components/students/WeakTopicsCard";
-import { WelcomeHeader } from "@/components/students/WelcomeHeader";
+// app/dashboard/page.tsx
+'use client';
 
-export default function StudentDashboard() {
+import { ChapterExam } from "@/components/dashboard/chapter-exam";
+import { SubjectDashboard } from "@/components/dashboard/subject-dashboard";
+import { TargetSetup } from "@/components/dashboard/target-setup";
+import { useState } from "react";
+
+type DashboardState = 'target-setup' | 'subject-dashboard' | 'chapter-exam';
+
+export default function DashboardPage() {
+  const [currentState, setCurrentState] = useState<DashboardState>('target-setup');
+  const [userTarget, setUserTarget] = useState<any>(null);
+  const [selectedChapter, setSelectedChapter] = useState<any>(null);
+
+  const handleTargetSetup = (target: any) => {
+    setUserTarget(target);
+    setCurrentState('subject-dashboard');
+  };
+
+  const handleStartChapterExam = (chapter: any) => {
+    setSelectedChapter(chapter);
+    setCurrentState('chapter-exam');
+  };
+
+  const handleExamComplete = () => {
+    setCurrentState('subject-dashboard');
+  };
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Welcome Header */}
-      <WelcomeHeader />
-
-      {/* Stats Overview - Different grid for different screens */}
-      <StatsGrid />
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left Column - Daily Goal & Recent Tests */}
-        <div className="xl:col-span-2 space-y-6">
-          <DailyGoalCard />
-          <RecentActivity />
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-red-50">
+      <div className="container mx-auto px-4 py-8">
+        {currentState === 'target-setup' && (
+          <TargetSetup onTargetSet={handleTargetSetup} />
+        )}
         
-        {/* Right Column - Quick Actions & Weak Topics */}
-        <div className="space-y-6">
-          <QuickActionsGrid />
-          <WeakTopics />
-        </div>
+        {currentState === 'subject-dashboard' && userTarget && (
+          <SubjectDashboard 
+            userTarget={userTarget}
+            onStartChapterExam={handleStartChapterExam}
+          />
+        )}
+        
+        {currentState === 'chapter-exam' && selectedChapter && (
+          <ChapterExam 
+            chapter={selectedChapter}
+            onComplete={handleExamComplete}
+            onBack={() => setCurrentState('subject-dashboard')}
+          />
+        )}
       </div>
     </div>
-  )
+  );
 }
