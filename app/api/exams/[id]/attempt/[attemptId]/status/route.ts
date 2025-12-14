@@ -1,4 +1,4 @@
-// app/api/exams/[examId]/attempt/[attemptId]/status/route.ts
+// app/api/exams/[id]/attempt/[attemptId]/status/route.ts - FIXED
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { examAttempts, exams } from '@/schema/user.schema';
@@ -8,7 +8,7 @@ import { authOptions } from '@/app/api/auth/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; attemptId: string } }
+  { params }: { params: Promise<{ id: string; attemptId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -20,8 +20,10 @@ export async function GET(
       );
     }
 
-    const { id, attemptId } = params;
+    const { id: examId, attemptId } = await params;
     const userId = session.user.id;
+
+    console.log('Checking attempt status:', { examId, attemptId, userId });
 
     // Check if attempt exists and belongs to user
     const [attempt] = await db.select()
@@ -30,7 +32,7 @@ export async function GET(
         and(
           eq(examAttempts.id, attemptId),
           eq(examAttempts.userId, userId),
-          eq(examAttempts.examId, id)
+          eq(examAttempts.examId, examId)
         )
       )
       .limit(1);
@@ -45,7 +47,7 @@ export async function GET(
     // Get exam details
     const [exam] = await db.select()
       .from(exams)
-      .where(eq(exams.id, id))
+      .where(eq(exams.id, examId))
       .limit(1);
 
     if (!exam) {
@@ -78,7 +80,11 @@ export async function GET(
   } catch (error) {
     console.error('Error checking attempt status:', error);
     return NextResponse.json(
-      { success: false, message: 'Failed to check attempt status' },
+      { 
+        success: false, 
+        message: 'Failed to check attempt status',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

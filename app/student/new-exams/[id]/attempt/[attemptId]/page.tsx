@@ -1,3 +1,4 @@
+// app/student/new-exams/[id]/attempt/[attemptId]/page.tsx - FIXED
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -23,10 +24,7 @@ interface Question {
   questionPaperItemId: string;
   questionNumber: number;
   question: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
+  options: Array<{ option: string; text: string }>;
   marks: number;
   hasImage: boolean;
   imageUrl?: string;
@@ -54,6 +52,7 @@ export default function ExamAttemptPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [autoSaveInterval, setAutoSaveInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -72,6 +71,11 @@ export default function ExamAttemptPage() {
         const now = new Date().getTime();
         const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
         setTimeRemaining(remaining);
+        
+        // Auto-submit when time runs out
+        if (remaining === 0 && attempt.status === 'in_progress') {
+          handleSubmitExam();
+        }
       };
       
       updateTimer();
@@ -85,78 +89,105 @@ export default function ExamAttemptPage() {
     // Auto-save every 30 seconds
     const interval = setInterval(() => {
       if (Object.keys(answers).length > 0) {
-        saveAnswers();
+        saveCurrentAnswer();
       }
     }, 30000);
     setAutoSaveInterval(interval);
 
     return () => {
-      if (autoSaveInterval) clearInterval(autoSaveInterval);
+      if (interval) clearInterval(interval);
     };
-  }, [answers]);
+  }, [answers, currentQuestionIndex]);
 
   const fetchAttemptData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Fetch attempt details
-      const attemptRes = await fetch(`/api/exams/${examId}/attempts/${attemptId}`);
+      console.log('Fetching attempt data:', { examId, attemptId });
+      
+      // FIXED: Use /attempt/ (singular) not /attempts/ (plural)
+      const attemptRes = await fetch(`/api/exams/${examId}/attempt/${attemptId}`);
+      
+      if (!attemptRes.ok) {
+        throw new Error(`Failed to fetch attempt: ${attemptRes.status}`);
+      }
+      
       const attemptData = await attemptRes.json();
+      console.log('Attempt data:', attemptData);
       
       if (attemptData.success) {
-        setAttempt(attemptData.data);
+        setAttempt(attemptData.data.attempt);
         
-        // Fetch questions for this attempt
-        const questionsRes = await fetch(`/api/exams/${examId}/attempts/${attemptId}/questions`);
+        // FIXED: Use /attempt/ (singular) not /attempts/ (plural)
+        const questionsRes = await fetch(`/api/exams/${examId}/attempt/${attemptId}/questions`);
+        
+        if (!questionsRes.ok) {
+          throw new Error(`Failed to fetch questions: ${questionsRes.status}`);
+        }
+        
         const questionsData = await questionsRes.json();
+        console.log('Questions data:', questionsData);
         
         if (questionsData.success) {
-          setQuestions(questionsData.data);
+          setQuestions(questionsData.data.questions);
           
           // Load saved answers
-          const answersRes = await fetch(`/api/exams/${examId}/attempts/${attemptId}/answers`);
-          const answersData = await answersRes.json();
+          const answersRes = await fetch(`/api/exams/${examId}/attempt/${attemptId}/answers`);
           
-          if (answersData.success && answersData.data) {
-            const savedAnswers: Record<string, string> = {};
-            answersData.data.forEach((answer: any) => {
-              if (answer.questionPaperItemId && answer.selectedOption) {
-                savedAnswers[answer.questionPaperItemId] = answer.selectedOption;
-              }
-            });
-            setAnswers(savedAnswers);
+          if (answersRes.ok) {
+            const answersData = await answersRes.json();
+            
+            if (answersData.success && answersData.data) {
+              const savedAnswers: Record<string, string> = {};
+              answersData.data.forEach((answer: any) => {
+                if (answer.questionPaperItemId && answer.selectedOption) {
+                  savedAnswers[answer.questionPaperItemId] = answer.selectedOption;
+                }
+              });
+              setAnswers(savedAnswers);
+            }
           }
+        } else {
+          throw new Error(questionsData.message || 'Failed to load questions');
         }
       } else {
-        alert('Failed to load attempt data');
-        router.push(`/exams/${examId}`);
+        throw new Error(attemptData.message || 'Failed to load attempt');
       }
     } catch (error) {
       console.error('Error fetching attempt data:', error);
-      alert('Failed to load exam');
+      setError(error instanceof Error ? error.message : 'Failed to load exam');
     } finally {
       setLoading(false);
     }
   };
 
-  const saveAnswers = async () => {
-    if (!attempt || Object.keys(answers).length === 0) return;
+  const saveCurrentAnswer = async () => {
+    if (!attempt || !questions[currentQuestionIndex] || saving) return;
+
+    const currentAnswer = answers[questions[currentQuestionIndex]?.questionPaperItemId];
+    
+    if (!currentAnswer) return; // Don't save if no answer selected
 
     setSaving(true);
     try {
-      const currentAnswer = answers[questions[currentQuestionIndex]?.questionPaperItemId];
+      // FIXED: Use /attempt/ (singular)
+      const response = await fetch(`/api/exams/${examId}/attempt/${attemptId}/answers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          questionPaperItemId: questions[currentQuestionIndex].questionPaperItemId,
+          selectedOption: currentAnswer,
+          isFlagged: flaggedQuestions.has(questions[currentQuestionIndex].questionPaperItemId),
+        }),
+      });
+
+      const data = await response.json();
       
-      if (currentAnswer) {
-        await fetch(`/api/exams/${examId}/attempts/${attemptId}/answers`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            questionPaperItemId: questions[currentQuestionIndex].questionPaperItemId,
-            selectedOption: currentAnswer,
-          }),
-        });
+      if (!data.success) {
+        console.error('Failed to save answer:', data.message);
       }
     } catch (error) {
       console.error('Error saving answer:', error);
@@ -172,8 +203,8 @@ export default function ExamAttemptPage() {
       [questionId]: option,
     }));
     
-    // Auto-save immediately
-    setTimeout(saveAnswers, 100);
+    // Auto-save after selection
+    setTimeout(() => saveCurrentAnswer(), 500);
   };
 
   const toggleFlagQuestion = () => {
@@ -190,6 +221,10 @@ export default function ExamAttemptPage() {
   };
 
   const handleQuestionNavigation = (index: number) => {
+    // Save current answer before navigating
+    if (answers[questions[currentQuestionIndex]?.questionPaperItemId]) {
+      saveCurrentAnswer();
+    }
     setCurrentQuestionIndex(index);
     setShowSidebar(false);
   };
@@ -210,8 +245,16 @@ export default function ExamAttemptPage() {
       return;
     }
 
+    // Save current answer first
+    if (answers[questions[currentQuestionIndex]?.questionPaperItemId]) {
+      await saveCurrentAnswer();
+    }
+
     try {
-      const response = await fetch(`/api/exams/${examId}/attempts/${attemptId}/submit`, {
+      setLoading(true);
+      
+      // FIXED: Use /attempt/ (singular)
+      const response = await fetch(`/api/exams/${examId}/attempt/${attemptId}/submit`, {
         method: 'POST',
       });
 
@@ -219,32 +262,37 @@ export default function ExamAttemptPage() {
 
       if (data.success) {
         alert('Exam submitted successfully!');
-        router.push(`/exams/${examId}/results/${attemptId}`);
+        router.push(`/student/new-exams/${examId}/results/${attemptId}`);
       } else {
         alert(data.message || 'Failed to submit exam');
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error submitting exam:', error);
       alert('Failed to submit exam');
+      setLoading(false);
     }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading exam...</p>
+        </div>
       </div>
     );
   }
 
-  if (!attempt || !questions.length) {
+  if (error || !attempt || !questions.length) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <AlertCircle className="w-12 h-12 text-red-500" />
-        <h1 className="mt-4 text-2xl font-bold text-gray-900">Exam Not Found</h1>
-        <p className="mt-2 text-gray-600">Unable to load exam questions.</p>
+        <h1 className="mt-4 text-2xl font-bold text-gray-900">Unable to Load Exam</h1>
+        <p className="mt-2 text-gray-600">{error || 'Unable to load exam questions.'}</p>
         <button
-          onClick={() => router.push(`/exams/${examId}`)}
+          onClick={() => router.push(`/student/new-exams/${examId}`)}
           className="mt-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
           Back to Exam
@@ -321,7 +369,7 @@ export default function ExamAttemptPage() {
         </header>
 
         {/* Question Area */}
-        <main className="flex-1 p-4 md:p-6">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           <div className="max-w-4xl mx-auto">
             {/* Question Card */}
             <div className="bg-white rounded-lg shadow p-6">
@@ -369,14 +417,13 @@ export default function ExamAttemptPage() {
 
               {/* Options */}
               <div className="space-y-3">
-                {['A', 'B', 'C', 'D'].map((option) => {
-                  const optionText = currentQuestion[`option${option}` as keyof Question] as string;
-                  const isSelected = answers[currentQuestion.questionPaperItemId] === option;
+                {currentQuestion.options.map((opt) => {
+                  const isSelected = answers[currentQuestion.questionPaperItemId] === opt.option;
                   
                   return (
                     <button
-                      key={option}
-                      onClick={() => handleAnswerSelect(option)}
+                      key={opt.option}
+                      onClick={() => handleAnswerSelect(opt.option)}
                       className={`w-full text-left p-4 rounded-lg border transition-all duration-200 ${
                         isSelected
                           ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-opacity-50'
@@ -396,8 +443,8 @@ export default function ExamAttemptPage() {
                           )}
                         </div>
                         <div>
-                          <span className="font-medium text-gray-900">Option {option}</span>
-                          <p className="mt-1 text-gray-700">{optionText}</p>
+                          <span className="font-medium text-gray-900">Option {opt.option}</span>
+                          <p className="mt-1 text-gray-700">{opt.text}</p>
                         </div>
                       </div>
                     </button>
@@ -419,7 +466,7 @@ export default function ExamAttemptPage() {
               
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={saveAnswers}
+                  onClick={saveCurrentAnswer}
                   disabled={saving}
                   className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md shadow-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -504,7 +551,7 @@ export default function ExamAttemptPage() {
                   <button
                     key={question.id}
                     onClick={() => handleQuestionNavigation(index)}
-                    className={`aspect-square flex items-center justify-center rounded-lg border text-sm font-medium transition-colors ${
+                    className={`aspect-square flex items-center justify-center rounded-lg border text-sm font-medium transition-colors relative ${
                       isCurrent
                         ? 'border-blue-500 bg-blue-50 text-blue-600 ring-2 ring-blue-500 ring-opacity-50'
                         : isAnswered

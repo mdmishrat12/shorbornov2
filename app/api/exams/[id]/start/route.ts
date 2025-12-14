@@ -1,4 +1,4 @@
-// app/api/exams/[examId]/start/route.ts - UPDATED
+// app/api/exams/[id]/start/route.ts - FIXED
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { 
@@ -16,7 +16,7 @@ import { authOptions } from '../../../auth/auth';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { examId: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -28,9 +28,12 @@ export async function POST(
       );
     }
 
-    const examId = params.examId;
+    // IMPORTANT: Await the params Promise
+    const { id: examId } = await params;
     const userId = session.user.id;
     const now = new Date();
+
+    console.log('Starting exam:', { examId, userId });
 
     // Check if exam exists
     const [exam] = await db.select()
@@ -45,12 +48,18 @@ export async function POST(
       );
     }
 
+    console.log('Exam found:', { 
+      id: exam.id, 
+      title: exam.title, 
+      status: exam.status 
+    });
+
     // Check exam status
-    if (exam.status !== 'live') {
+    if (exam.status !== 'live' && exam.status !== 'scheduled') {
       return NextResponse.json(
         { 
           success: false, 
-          message: `Exam is not live. Current status: ${exam.status}` 
+          message: `Exam is not available. Current status: ${exam.status}` 
         },
         { status: 403 }
       );
@@ -105,10 +114,12 @@ export async function POST(
       );
     }
 
+    console.log('Registration check passed');
+
     // Check max attempts
     if (exam.maxAttempts > 0) {
       const attemptsCount = await db
-        .select({ count: db.fn.count() })
+        .select()
         .from(examAttempts)
         .where(
           and(
@@ -117,8 +128,9 @@ export async function POST(
           )
         );
 
-      const count = attemptsCount[0]?.count || 0;
-      if (count >= exam.maxAttempts) {
+      console.log('Attempts count:', attemptsCount.length);
+
+      if (attemptsCount.length >= exam.maxAttempts) {
         return NextResponse.json(
           { success: false, message: 'Maximum attempts reached' },
           { status: 403 }
@@ -139,6 +151,7 @@ export async function POST(
       .limit(1);
 
     if (existingAttempt) {
+      console.log('Resuming existing attempt:', existingAttempt.id);
       // Resume existing attempt
       return NextResponse.json({
         success: true,
@@ -168,6 +181,8 @@ export async function POST(
       .from(questionPaperItems)
       .where(eq(questionPaperItems.questionPaperId, questionPaper.id));
 
+    console.log('Questions count:', questionItems.length);
+
     // Create new attempt
     const attemptId = uuidv4();
     const startedAt = new Date();
@@ -186,6 +201,8 @@ export async function POST(
       timeSpent: 0
     }).returning();
 
+    console.log('New attempt created:', newAttempt.id);
+
     // Create exam session
     const sessionId = uuidv4();
     await db.insert(examSessions).values({
@@ -193,11 +210,14 @@ export async function POST(
       attemptId,
       userId,
       sessionToken: uuidv4(),
-      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      ipAddress: request.headers.get('x-forwarded-for') || 
+                 request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
       currentQuestion: 1,
       isActive: true
     });
+
+    console.log('Session created:', sessionId);
 
     return NextResponse.json({
       success: true,
@@ -214,7 +234,11 @@ export async function POST(
   } catch (error) {
     console.error('Error starting exam:', error);
     return NextResponse.json(
-      { success: false, message: 'Failed to start exam' },
+      { 
+        success: false, 
+        message: 'Failed to start exam',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
